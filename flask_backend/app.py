@@ -136,6 +136,11 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=ENVIRONMENT == "production",
 )
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = "campushub-files"
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialise the MongoDB-backed store (connects lazily on first use)
 store = Store()

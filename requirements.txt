@@ -1,1 +1,2 @@
 -r flask_backend/requirements.txt
+supabase>=2,<3

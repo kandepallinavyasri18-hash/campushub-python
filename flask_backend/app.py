@@ -668,10 +668,23 @@ def remove_resource(resource_id):
 
 
 def stored_file(item):
-    if not item or not item.get("storagePath"): raise FileNotFoundError("Document not found.")
+    if not item or not item.get("storagePath"):
+        raise FileNotFoundError("Document not found.")
+
+    if item.get("storageProvider") == "supabase":
+        file_data = supabase.storage.from_("campushub-files").download(
+            item["storagePath"]
+        )
+        return file_data
+
     path = Path(item["storagePath"]).resolve()
-    if UPLOADS.resolve() not in path.parents: raise ValueError("The stored file path is invalid.")
-    if not path.is_file(): raise FileNotFoundError()
+
+    if UPLOADS.resolve() not in path.parents:
+        raise ValueError("The stored file path is invalid.")
+
+    if not path.is_file():
+        raise FileNotFoundError()
+
     return path
 
 

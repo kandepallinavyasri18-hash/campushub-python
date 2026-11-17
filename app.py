@@ -1,0 +1,10 @@
+"""WSGI entry point for local use and Render/Gunicorn deployment."""
+
+import os
+from flask_backend.app import app
+
+__all__ = ["app"]
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

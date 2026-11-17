@@ -732,8 +732,10 @@ def preview_resource(resource_id):
     item = store.resources.find_one({"_id": oid(resource_id), "isActive": True})
     if not item:
         return api_error("Resource not found.", "NOT_FOUND", 404)
+
     if not item.get("storagePath") and item.get("url"):
         return redirect(item["url"])
+
     try:
         source = stored_file(item)
     except ValueError as error:
@@ -743,25 +745,56 @@ def preview_resource(resource_id):
             return redirect(item["url"])
         return api_error("The uploaded file is no longer available.", "FILE_MISSING", 404)
 
-    extension = Path(item.get("originalName", source.name)).suffix.lower()
+    filename = item.get("originalName") or item.get("fileName") or "document"
+    extension = Path(filename).suffix.lower()
+    is_bytes = isinstance(source, bytes)
+
     if extension in OFFICE_EXTENSIONS or item.get("mimeType") in OFFICE_MIMES:
         preview_dir = UPLOADS / ".previews"
         preview_dir.mkdir(exist_ok=True)
-        preview = preview_dir / f"{item.get('fileName', source.name)}.pdf"
+        preview = preview_dir / f"{item.get('fileName', filename)}.pdf"
+
         if preview.exists():
-            return send_file(preview, mimetype="application/pdf", as_attachment=False,
-                             download_name=f"{Path(item.get('originalName', source.name)).stem}.pdf")
-        soffice = os.getenv("LIBREOFFICE_PATH") or (r"C:\Program Files\LibreOffice\program\soffice.exe" if os.name == "nt" else "soffice")
+            return send_file(
+                preview,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=f"{Path(filename).stem}.pdf"
+            )
+
         conversion = preview_dir / f"conversion-{uuid.uuid4().hex}"
         conversion.mkdir(exist_ok=True)
+
         try:
-            subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", str(conversion), str(source)],
-                           check=True, timeout=120, capture_output=True)
+            if is_bytes:
+                source_path = conversion / filename
+                source_path.write_bytes(source)
+            else:
+                source_path = source
+
+            soffice = os.getenv("LIBREOFFICE_PATH") or (
+                r"C:\Program Files\LibreOffice\program\soffice.exe"
+                if os.name == "nt" else "soffice"
+            )
+
+            subprocess.run(
+                [soffice, "--headless", "--convert-to", "pdf",
+                 "--outdir", str(conversion), str(source_path)],
+                check=True,
+                timeout=120,
+                capture_output=True
+            )
+
             generated = next(conversion.glob("*.pdf"), None)
+
             if generated:
                 shutil.copyfile(generated, preview)
-                return send_file(preview, mimetype="application/pdf", as_attachment=False,
-                                 download_name=f"{Path(item.get('originalName', source.name)).stem}.pdf")
+                return send_file(
+                    preview,
+                    mimetype="application/pdf",
+                    as_attachment=False,
+                    download_name=f"{Path(filename).stem}.pdf"
+                )
         except Exception:
             pass
         finally:
@@ -769,13 +802,18 @@ def preview_resource(resource_id):
 
     mime = item.get("mimeType")
     if not mime or mime == "application/octet-stream":
-        guessed_mime, _ = mimetypes.guess_type(item.get("originalName") or source.name)
+        guessed_mime, _ = mimetypes.guess_type(filename)
         mime = guessed_mime or "application/octet-stream"
 
-    return send_file(source, mimetype=mime, as_attachment=False,
-                     download_name=item.get("originalName") or item.get("fileName"))
+    if is_bytes:
+        source = BytesIO(source)
 
-
+    return send_file(
+        source,
+        mimetype=mime,
+        as_attachment=False,
+        download_name=filename
+    )
 def question_json(item):
     resource = item.get("_resource")
     asked = item.get("_asked")

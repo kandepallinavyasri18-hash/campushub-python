@@ -1325,17 +1325,37 @@ SUBMISSION_EXTENSIONS = {".pdf", ".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg
 def save_upload(file, allowed_extensions, label):
     original = secure_filename(file.filename or "")
     extension = Path(original).suffix.lower()
+
     if not original or extension not in allowed_extensions:
-        raise ValueError(f"{label} must use one of these file types: {', '.join(sorted(allowed_extensions))}.")
-    filename = f"{int(datetime.now().timestamp() * 1000)}-{uuid.uuid4().hex}{extension}"
-    destination = UPLOADS / filename
-    file.save(destination)
+        raise ValueError(
+            f"{label} must use one of these file types: "
+            f"{', '.join(sorted(allowed_extensions))}."
+        )
+
+    filename = (
+        f"{int(datetime.now().timestamp() * 1000)}-"
+        f"{uuid.uuid4().hex}{extension}"
+    )
+
+    mime_type = file.mimetype or "application/octet-stream"
+    file_data = file.read()
+
+    supabase.storage.from_("campushub-files").upload(
+        filename,
+        file_data,
+        file_options={
+            "content-type": mime_type,
+            "upsert": "false"
+        }
+    )
+
     return {
         "originalName": file.filename,
         "fileName": filename,
-        "mimeType": file.mimetype or "application/octet-stream",
-        "fileSize": destination.stat().st_size,
-        "storagePath": str(destination),
+        "mimeType": mime_type,
+        "fileSize": len(file_data),
+        "storagePath": filename,
+        "storageProvider": "supabase",
     }
 
 

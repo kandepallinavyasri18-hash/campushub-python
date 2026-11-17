@@ -3,6 +3,8 @@
 Run from the project root with ``.venv\\Scripts\\python.exe -m flask
 --app flask_backend.app run`` (or execute this file directly).
 """
+from pymongo.errors import DuplicateKeyError
+from supabase import create_client
 import os
 import re
 import shutil

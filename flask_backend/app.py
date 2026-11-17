@@ -695,21 +695,35 @@ def download_resource(resource_id):
     item = store.resources.find_one({"_id": oid(resource_id), "isActive": True})
     if not item:
         return api_error("Resource not found.", "NOT_FOUND", 404)
+
     if not item.get("storagePath") and item.get("url"):
         return redirect(item["url"])
+
     try:
-        path = stored_file(item)
+        file_data = stored_file(item)
     except ValueError as error:
         return api_error(str(error), "INVALID_FILE_PATH", 400)
     except FileNotFoundError:
         if item.get("url"):
             return redirect(item["url"])
         return api_error("The uploaded file is no longer available.", "FILE_MISSING", 404)
+
+    filename = item.get("originalName") or item.get("fileName") or "download"
     mime = item.get("mimeType")
+
     if not mime or mime == "application/octet-stream":
-        guessed_mime, _ = mimetypes.guess_type(item.get("originalName") or path.name)
+        guessed_mime, _ = mimetypes.guess_type(filename)
         mime = guessed_mime or "application/octet-stream"
-    return send_file(path, mimetype=mime, as_attachment=True, download_name=item.get("originalName") or item.get("fileName"))
+
+    if isinstance(file_data, bytes):
+        file_data = BytesIO(file_data)
+
+    return send_file(
+        file_data,
+        mimetype=mime,
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 @app.get("/api/resources/<resource_id>/preview")
